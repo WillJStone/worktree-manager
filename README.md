@@ -1,20 +1,129 @@
 # worktree-manager
 
-A Bun CLI for creating and managing Git worktrees inside the current repository.
+`worktree-manager` is a Bun CLI for creating and managing Git worktrees from inside the repo you are currently in.
 
-## Commands
+It detects the current Git root automatically, creates worktrees in `.claude/worktrees`, and provides a small command set for the common lifecycle:
+- create a worktree from the repo default branch
+- list worktrees in readable columns
+- open an existing worktree
+- remove a worktree safely
+- prune stale worktree metadata
+
+## Prerequisites
+
+- `git`
+- `bun`
+- optional: `codex`, `claude`, or `pi` on your `PATH` if you want launcher support after `new` and `open`
+
+## Setup
+
+### 1. Clone the repo
 
 ```bash
-bun run src/cli.ts new <branch-slug>
-bun run src/cli.ts list
-bun run src/cli.ts open [branch-slug]
-bun run src/cli.ts rm [branch-slug]
-bun run src/cli.ts prune
+git clone https://github.com/WillJStone/worktree-manager.git
+cd worktree-manager
 ```
 
-## Behavior
+### 2. Link the CLI globally
 
-- Detects the Git repo from the current working directory
-- Creates worktrees in `.claude/worktrees`
-- Bases new branches on the repo's detected default branch
-- Lets you launch `codex`, `claude`, `pi`, or nothing after `new` and `open`
+This makes `wtm` available from anywhere.
+
+```bash
+bun link
+```
+
+Confirm it works:
+
+```bash
+wtm help
+```
+
+### 3. Optional: enable `zsh` completion
+
+This enables branch-name completion for commands like `wtm open <TAB>` and `wtm rm <TAB>`.
+
+Add this to your `~/.zshrc`:
+
+```zsh
+source /path/to/worktree-manager/completions/_wtm.zsh
+```
+
+If the repo lives at `~/Repositories/worktree-manager`, the line would be:
+
+```zsh
+source ~/Repositories/worktree-manager/completions/_wtm.zsh
+```
+
+Reload your shell:
+
+```bash
+source ~/.zshrc
+```
+
+## Usage
+
+Run `wtm` from anywhere inside a Git repo.
+
+### Create a worktree
+
+```bash
+wtm new feature/my-branch
+```
+
+This will:
+- detect the repo root
+- detect the repo default branch
+- create a new branch from that default branch
+- create a worktree at `.claude/worktrees/feature--my-branch`
+- offer to launch `codex`, `claude`, or `pi`
+
+### List worktrees
+
+```bash
+wtm list
+```
+
+### Open a worktree
+
+```bash
+wtm open feature/my-branch
+```
+
+You can also use shell completion:
+
+```bash
+wtm open <TAB>
+```
+
+### Remove a worktree
+
+```bash
+wtm rm feature/my-branch
+```
+
+By default, removal is safe:
+- it refuses to remove the main worktree
+- it refuses to remove a dirty worktree unless `--force` is used
+
+### Prune stale metadata
+
+```bash
+wtm prune
+```
+
+## Command reference
+
+```bash
+wtm new <branch-slug> [--agent <codex|claude|pi>] [--no-agent]
+wtm list [--pick]
+wtm open [branch-slug] [--agent <codex|claude|pi>] [--no-agent]
+wtm rm [branch-slug] [--force]
+wtm prune
+```
+
+## Notes
+
+- The CLI has no runtime package dependencies; it uses Bun plus Node built-ins only
+- Worktrees are repo-local and live under `.claude/worktrees`
+- Branch slugs with `/` are mapped to directory names using `--`
+- `Esc` cancels the interactive launcher picker without launching anything
