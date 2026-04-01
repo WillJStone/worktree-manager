@@ -50,6 +50,9 @@ async function maybeLaunch(
   }
 
   const selected = await pickAgent(defaultAgent);
+  if (selected === undefined) {
+    return;
+  }
   await launchAgent(selected, path);
 }
 
