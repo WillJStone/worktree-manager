@@ -15,7 +15,6 @@ _wtm_agents() {
     'codex:launch Codex'
     'claude:launch Claude'
     'pi:launch Pi'
-    'nothing:do not launch an agent'
   )
   _describe 'agent' agents
 }

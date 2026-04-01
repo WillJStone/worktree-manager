@@ -14,9 +14,9 @@ function printHelp(): void {
   console.log(`wtm - worktree manager
 
 Usage:
-  wtm new <branch-slug> [--agent <codex|claude|pi|nothing>] [--no-agent]
+  wtm new <branch-slug> [--agent <codex|claude|pi>] [--no-agent]
   wtm list [--pick]
-  wtm open [branch-slug] [--agent <codex|claude|pi|nothing>] [--no-agent]
+  wtm open [branch-slug] [--agent <codex|claude|pi>] [--no-agent]
   wtm rm [branch-slug] [--force]
   wtm prune
   wtm completion <worktrees|default-branch> [prefix]

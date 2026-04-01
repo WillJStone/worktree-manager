@@ -118,14 +118,119 @@ function getColumnWidths(context: RepoContext, entries: WorktreeEntry[]): {
   };
 }
 
-async function readLine(prompt: string): Promise<string> {
-  process.stdout.write(prompt);
-
-  for await (const chunk of process.stdin) {
-    return chunk.toString().trim();
+function clearRenderedMenu(lines: number): void {
+  if (lines <= 0 || !process.stdout.isTTY) {
+    return;
   }
 
-  return "";
+  for (let index = 0; index < lines; index += 1) {
+    process.stdout.write("\r");
+    process.stdout.write("\u001b[2K");
+    if (index < lines - 1) {
+      process.stdout.write("\u001b[1A");
+    }
+  }
+
+  process.stdout.write("\r");
+}
+
+function renderMenu<T>(
+  title: string,
+  items: T[],
+  renderItem: (item: T, index: number) => string,
+  selectedIndex: number,
+): number {
+  const lines: string[] = [colorize(title, ansi.bold)];
+
+  for (const [index, item] of items.entries()) {
+    const isSelected = index === selectedIndex;
+    const pointer = isSelected ? colorize("›", ansi.cyan) : " ";
+    const content = renderItem(item, index);
+    lines.push(` ${pointer} ${content}`);
+  }
+
+  lines.push(colorize("Use ↑/↓ to move, Enter to select, Esc to cancel.", ansi.dim));
+  process.stdout.write(lines.join("\n"));
+  return lines.length;
+}
+
+async function readMenuSelection<T>(
+  title: string,
+  items: T[],
+  renderItem: (item: T, index: number) => string,
+  defaultIndex: number,
+): Promise<T | undefined> {
+  const stdin = process.stdin;
+  if (!stdin.isTTY || typeof stdin.setRawMode !== "function") {
+    return items[defaultIndex];
+  }
+
+  let selectedIndex = defaultIndex;
+  let renderedLines = renderMenu(title, items, renderItem, selectedIndex);
+
+  stdin.setRawMode(true);
+  stdin.resume();
+  stdin.setEncoding("utf8");
+
+  return await new Promise<T | undefined>((resolve, reject) => {
+    let settled = false;
+
+    const cleanup = () => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      stdin.setRawMode(false);
+      stdin.pause();
+      stdin.removeListener("data", onData);
+      clearRenderedMenu(renderedLines);
+    };
+
+    const finish = (value: T | undefined) => {
+      cleanup();
+      resolve(value);
+    };
+
+    const fail = (error: Error) => {
+      cleanup();
+      reject(error);
+    };
+
+    const rerender = () => {
+      clearRenderedMenu(renderedLines);
+      renderedLines = renderMenu(title, items, renderItem, selectedIndex);
+    };
+
+    const onData = (chunk: string) => {
+      switch (chunk) {
+        case "\u0003":
+          fail(new Error("Selection cancelled."));
+          return;
+        case "\u001b":
+          finish(undefined);
+          return;
+        case "\r":
+        case "\n":
+          finish(items[selectedIndex]);
+          return;
+        case "\u001b[A":
+        case "k":
+          selectedIndex = selectedIndex === 0 ? items.length - 1 : selectedIndex - 1;
+          rerender();
+          return;
+        case "\u001b[B":
+        case "j":
+          selectedIndex = selectedIndex === items.length - 1 ? 0 : selectedIndex + 1;
+          rerender();
+          return;
+        default:
+          return;
+      }
+    };
+
+    stdin.on("data", onData);
+  });
 }
 
 export async function selectFromMenu<T>(
@@ -142,24 +247,7 @@ export async function selectFromMenu<T>(
     return items[defaultIndex];
   }
 
-  console.log(colorize(title, ansi.bold));
-  for (const [index, item] of items.entries()) {
-    const marker = index === defaultIndex ? colorize(">", ansi.cyan) : " ";
-    const number = colorize(pad(`${index + 1}.`, 4), ansi.dim);
-    console.log(` ${marker} ${number} ${renderItem(item, index)}`);
-  }
-
-  const answer = await readLine(colorize(`Select [${defaultIndex + 1}]: `, ansi.dim));
-  if (answer.length === 0) {
-    return items[defaultIndex];
-  }
-
-  const numericIndex = Number(answer);
-  if (!Number.isInteger(numericIndex) || numericIndex < 1 || numericIndex > items.length) {
-    throw new Error("Invalid selection.");
-  }
-
-  return items[numericIndex - 1];
+  return readMenuSelection(title, items, renderItem, defaultIndex);
 }
 
 export function printWorktrees(context: RepoContext, entries: WorktreeEntry[]): void {
@@ -210,10 +298,10 @@ export async function pickWorktree(
   );
 }
 
-export async function pickAgent(defaultAgent: AgentName = "codex"): Promise<AgentName> {
-  const agents: AgentName[] = ["codex", "claude", "pi", "nothing"];
+export async function pickAgent(defaultAgent: AgentName = "codex"): Promise<AgentName | undefined> {
+  const agents: AgentName[] = ["codex", "claude", "pi"];
   const defaultIndex = agents.indexOf(defaultAgent);
-  const selected = await selectFromMenu(
+  return selectFromMenu(
     "Launch agent:",
     agents,
     (agent) => {
@@ -225,8 +313,6 @@ export async function pickAgent(defaultAgent: AgentName = "codex"): Promise<Agen
     },
     defaultIndex === -1 ? 0 : defaultIndex,
   );
-
-  return selected ?? defaultAgent;
 }
 
 export function isInteractiveSession(): boolean {
