@@ -2,7 +2,7 @@
 
 `worktree-manager` is a Bun CLI for creating and managing Git worktrees from inside the repo you are currently in.
 
-It is intentionally dependency-free at runtime. That is a design feature, not an accident: the CLI uses Bun plus Node built-ins only.
+It is intentionally dependency-free at runtime. The CLI uses Bun plus Node built-ins only.
 
 It detects the current Git root automatically, creates worktrees in `.claude/worktrees`, and provides a small command set for the common lifecycle:
 - create a worktree from the repo default branch
@@ -10,13 +10,6 @@ It detects the current Git root automatically, creates worktrees in `.claude/wor
 - open an existing worktree
 - remove a worktree safely
 - prune stale worktree metadata
-
-## Why dependency-free matters
-
-- no prompt or TUI libraries to drag in
-- no runtime package churn
-- easier to audit and maintain
-- simpler installs and fewer breakpoints
 
 ## Prerequisites
 
