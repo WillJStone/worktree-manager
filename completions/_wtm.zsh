@@ -26,6 +26,7 @@ _wtm() {
     'list:list worktrees for the current repo'
     'open:open an existing worktree'
     'rm:remove an existing worktree'
+    'clean:review and remove merged or stale worktree candidates'
     'prune:prune stale worktree metadata'
     'help:show help'
   )

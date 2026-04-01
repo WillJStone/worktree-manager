@@ -2,6 +2,7 @@
 
 import {
   runCompletion,
+  runClean,
   runList,
   runNew,
   runOpen,
@@ -18,6 +19,7 @@ Usage:
   wtm list [--pick]
   wtm open [branch-slug] [--agent <codex|claude|pi>] [--no-agent]
   wtm rm [branch-slug] [--force]
+  wtm clean
   wtm prune
   wtm completion <worktrees|default-branch> [prefix]
 `);
@@ -63,6 +65,9 @@ async function main(): Promise<void> {
         break;
       case "rm":
         await runRemove(options);
+        break;
+      case "clean":
+        await runClean();
         break;
       case "prune":
         await runPrune();

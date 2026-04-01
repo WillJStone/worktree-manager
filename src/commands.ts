@@ -3,14 +3,23 @@ import {
   createWorktree,
   detectDefaultBranch,
   findWorktree,
+  getCleanupCandidates,
   listWorktrees,
+  performCleanupCandidate,
   pruneWorktrees,
   removeWorktree,
   resolveRepoContext,
 } from "./git";
 import { launchAgent } from "./launch";
 import type { AgentName, WorktreeEntry } from "./types";
-import { isInteractiveSession, pickAgent, pickWorktree, printWorktrees } from "./ui";
+import {
+  isInteractiveSession,
+  pickAgent,
+  pickCleanupCandidate,
+  pickWorktree,
+  printCleanupCandidates,
+  printWorktrees,
+} from "./ui";
 
 export interface CliOptions {
   args: string[];
@@ -23,11 +32,11 @@ function getAgentFromFlags(flags: Map<string, string | boolean>): AgentName | un
     return undefined;
   }
 
-  if (value === "codex" || value === "claude" || value === "pi" || value === "nothing") {
+  if (value === "codex" || value === "claude" || value === "pi") {
     return value;
   }
 
-  throw new Error(`Unsupported agent '${value}'. Use codex, claude, pi, or nothing.`);
+  throw new Error(`Unsupported agent '${value}'. Use codex, claude, or pi.`);
 }
 
 async function maybeLaunch(
@@ -132,6 +141,32 @@ export async function runPrune(): Promise<void> {
     console.log(output);
   }
   console.log("Pruned stale worktree metadata.");
+}
+
+export async function runClean(): Promise<void> {
+  const context = resolveRepoContext(process.cwd());
+  const candidates = getCleanupCandidates(context);
+  printCleanupCandidates(context, candidates);
+
+  if (candidates.length === 0) {
+    return;
+  }
+
+  if (!isInteractiveSession()) {
+    console.log("Run `wtm clean` in an interactive shell to choose a cleanup candidate.");
+    return;
+  }
+
+  const selected = await pickCleanupCandidate(context, candidates);
+  if (!selected) {
+    const blockedCount = candidates.filter((candidate) => candidate.blockedReason).length;
+    if (blockedCount > 0) {
+      console.log("No removable cleanup candidates. Dirty merged worktrees must be removed manually with `wtm rm --force`.");
+    }
+    return;
+  }
+
+  console.log(performCleanupCandidate(context, selected));
 }
 
 export async function runCompletion(options: CliOptions): Promise<void> {

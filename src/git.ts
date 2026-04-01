@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync } from "node:fs";
 import { basename, join, relative, resolve } from "node:path";
-import type { RepoContext, WorktreeEntry } from "./types";
+import type { CleanupCandidate, RepoContext, WorktreeEntry } from "./types";
 
 interface CommandResult {
   stdout: string;
@@ -128,6 +128,12 @@ export function createWorktree(context: RepoContext, branchSlug: string): string
   return worktreePath;
 }
 
+interface StatusSummary {
+  isDirty: boolean;
+  modifiedCount: number;
+  untrackedCount: number;
+}
+
 function parseWorktreeList(output: string, mainRoot: string): WorktreeEntry[] {
   const blocks = output
     .split("\n\n")
@@ -143,6 +149,9 @@ function parseWorktreeList(output: string, mainRoot: string): WorktreeEntry[] {
       prunable: false,
       isMain: false,
       isDirty: false,
+      modifiedCount: 0,
+      untrackedCount: 0,
+      mergedIntoDefault: false,
     };
 
     for (const line of block.split("\n")) {
@@ -178,9 +187,80 @@ function parseWorktreeList(output: string, mainRoot: string): WorktreeEntry[] {
   });
 }
 
-export function isWorktreeDirty(path: string): boolean {
+function getStatusSummary(path: string): StatusSummary {
   const result = runGit(["status", "--porcelain"], path);
-  return result.exitCode === 0 && result.stdout.length > 0;
+  if (result.exitCode !== 0 || result.stdout.length === 0) {
+    return {
+      isDirty: false,
+      modifiedCount: 0,
+      untrackedCount: 0,
+    };
+  }
+
+  let modifiedCount = 0;
+  let untrackedCount = 0;
+
+  for (const line of result.stdout.split("\n")) {
+    if (!line) {
+      continue;
+    }
+
+    if (line.startsWith("??")) {
+      untrackedCount += 1;
+      continue;
+    }
+
+    modifiedCount += 1;
+  }
+
+  return {
+    isDirty: modifiedCount > 0 || untrackedCount > 0,
+    modifiedCount,
+    untrackedCount,
+  };
+}
+
+function getUpstreamBranch(path: string): string | undefined {
+  const result = runGit(
+    ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"],
+    path,
+  );
+  if (result.exitCode !== 0 || result.stdout.length === 0) {
+    return undefined;
+  }
+
+  return result.stdout;
+}
+
+function getAheadBehind(path: string): { aheadCount?: number; behindCount?: number } {
+  const upstreamBranch = getUpstreamBranch(path);
+  if (!upstreamBranch) {
+    return {};
+  }
+
+  const result = runGit(["rev-list", "--left-right", "--count", `HEAD...${upstreamBranch}`], path);
+  if (result.exitCode !== 0 || result.stdout.length === 0) {
+    return { upstreamBranch };
+  }
+
+  const [aheadRaw, behindRaw] = result.stdout.split(/\s+/);
+  return {
+    upstreamBranch,
+    aheadCount: Number(aheadRaw) || 0,
+    behindCount: Number(behindRaw) || 0,
+  };
+}
+
+function isMergedIntoDefault(context: RepoContext, branch: string | undefined): boolean {
+  if (!branch || branch === context.defaultBranch) {
+    return false;
+  }
+
+  const result = runGit(
+    ["merge-base", "--is-ancestor", branch, context.defaultBranch],
+    context.gitRoot,
+  );
+  return result.exitCode === 0;
 }
 
 export function listWorktrees(context: RepoContext): WorktreeEntry[] {
@@ -193,7 +273,14 @@ export function listWorktrees(context: RepoContext): WorktreeEntry[] {
   const entries = parseWorktreeList(output, context.gitRoot);
   return entries.map((entry) => ({
     ...entry,
-    isDirty: !entry.bare && !entry.prunable && isWorktreeDirty(entry.path),
+    ...(!entry.bare && !entry.prunable ? getStatusSummary(entry.path) : {
+      isDirty: false,
+      modifiedCount: 0,
+      untrackedCount: 0,
+    }),
+    ...(!entry.bare && !entry.prunable ? getAheadBehind(entry.path) : {}),
+    mergedIntoDefault:
+      !entry.bare && !entry.prunable && !entry.isMain ? isMergedIntoDefault(context, entry.branch) : false,
   }));
 }
 
@@ -246,4 +333,51 @@ export function pruneWorktrees(context: RepoContext): string {
   }
 
   return result.stdout;
+}
+
+export function getCleanupCandidates(context: RepoContext): CleanupCandidate[] {
+  return listWorktrees(context)
+    .filter((entry) => entry.prunable || entry.mergedIntoDefault)
+    .map((entry) => {
+      if (entry.prunable) {
+        return {
+          entry,
+          action: "prune",
+          reason: "prunable",
+        };
+      }
+
+      if (entry.isDirty) {
+        return {
+          entry,
+          reason: "merged",
+          blockedReason: "dirty",
+        };
+      }
+
+      return {
+        entry,
+        action: "remove",
+        reason: "merged",
+      };
+    });
+}
+
+export function performCleanupCandidate(context: RepoContext, candidate: CleanupCandidate): string {
+  if (candidate.blockedReason) {
+    throw new Error(`Cleanup candidate is blocked: ${candidate.entry.path} (${candidate.blockedReason})`);
+  }
+
+  if (candidate.action === "remove") {
+    removeWorktree(context, candidate.entry);
+    pruneWorktrees(context);
+    return `Removed ${relative(context.gitRoot, candidate.entry.path) || candidate.entry.path}`;
+  }
+
+  if (candidate.action === "prune") {
+    pruneWorktrees(context);
+    return "Pruned stale worktree metadata.";
+  }
+
+  throw new Error(`Cleanup candidate is not actionable: ${candidate.entry.path}`);
 }

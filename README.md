@@ -85,6 +85,8 @@ This will:
 wtm list
 ```
 
+`list` shows branch, path, state, worktree kind, upstream sync, modified count, and untracked count.
+
 ### Open a worktree
 
 ```bash
@@ -113,6 +115,14 @@ By default, removal is safe:
 wtm prune
 ```
 
+### Review cleanup candidates
+
+```bash
+wtm clean
+```
+
+`clean` shows merged and stale cleanup candidates, lets you choose one actionable candidate interactively, removes only the worktree, and then runs prune.
+
 ## Command reference
 
 ```bash
@@ -120,6 +130,7 @@ wtm new <branch-slug> [--agent <codex|claude|pi>] [--no-agent]
 wtm list [--pick]
 wtm open [branch-slug] [--agent <codex|claude|pi>] [--no-agent]
 wtm rm [branch-slug] [--force]
+wtm clean
 wtm prune
 ```
 

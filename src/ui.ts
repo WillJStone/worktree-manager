@@ -1,5 +1,5 @@
 import { relative } from "node:path";
-import type { AgentName, RepoContext, WorktreeEntry } from "./types";
+import type { AgentName, CleanupCandidate, RepoContext, WorktreeEntry } from "./types";
 
 const ansi = {
   reset: "\u001b[0m",
@@ -97,6 +97,49 @@ function formatRole(entry: WorktreeEntry): string {
   return colorize("LINKED", ansi.gray);
 }
 
+function formatSync(entry: WorktreeEntry): string {
+  if (entry.upstreamBranch === undefined) {
+    return colorize("-", ansi.dim);
+  }
+
+  const ahead = entry.aheadCount ?? 0;
+  const behind = entry.behindCount ?? 0;
+  const value = `+${ahead}/-${behind}`;
+  if (ahead === 0 && behind === 0) {
+    return colorize(value, ansi.dim);
+  }
+
+  return value;
+}
+
+function formatCount(value: number): string {
+  if (value === 0) {
+    return colorize("0", ansi.dim);
+  }
+
+  return String(value);
+}
+
+function getCleanupReason(candidate: CleanupCandidate): string {
+  if (candidate.reason === "prunable") {
+    return "stale metadata";
+  }
+
+  return "merged into default";
+}
+
+function formatCleanupAction(candidate: CleanupCandidate): string {
+  if (candidate.blockedReason === "dirty") {
+    return colorize("BLOCKED", ansi.red);
+  }
+
+  if (candidate.action === "prune") {
+    return colorize("PRUNE", ansi.yellow);
+  }
+
+  return colorize("REMOVE", ansi.green);
+}
+
 function getColumnWidths(context: RepoContext, entries: WorktreeEntry[]): {
   branch: number;
   path: number;
@@ -115,6 +158,31 @@ function getColumnWidths(context: RepoContext, entries: WorktreeEntry[]): {
     branch: Math.min(branch, 32),
     path: Math.min(path, 56),
     role: "KIND".length,
+  };
+}
+
+function getCleanupColumnWidths(context: RepoContext, candidates: CleanupCandidate[]): {
+  branch: number;
+  path: number;
+  reason: number;
+} {
+  const branch = Math.max(
+    "BRANCH".length,
+    ...candidates.map((candidate) => (candidate.entry.branch ?? "(detached)").length),
+  );
+  const path = Math.max(
+    "PATH".length,
+    ...candidates.map((candidate) => (relative(context.gitRoot, candidate.entry.path) || ".").length),
+  );
+  const reason = Math.max(
+    "REASON".length,
+    ...candidates.map((candidate) => getCleanupReason(candidate).length),
+  );
+
+  return {
+    branch: Math.min(branch, 32),
+    path: Math.min(path, 56),
+    reason: Math.min(reason, 24),
   };
 }
 
@@ -262,6 +330,9 @@ export function printWorktrees(context: RepoContext, entries: WorktreeEntry[]): 
     pad("PATH", widths.path),
     pad("STATE", 8),
     pad("KIND", widths.role),
+    pad("SYNC", 9),
+    pad("MOD", 3),
+    pad("NEW", 3),
   ].join("  ");
   console.log(colorize(header, ansi.bold));
   console.log(colorize("-".repeat(header.length), ansi.dim));
@@ -272,6 +343,9 @@ export function printWorktrees(context: RepoContext, entries: WorktreeEntry[]): 
       pad(formatPath(context, entry, widths.path), widths.path),
       pad(formatState(entry), 8),
       pad(formatRole(entry), widths.role),
+      pad(formatSync(entry), 9),
+      pad(formatCount(entry.modifiedCount), 3),
+      pad(formatCount(entry.untrackedCount), 3),
     ].join("  ");
     console.log(row);
   }
@@ -292,6 +366,9 @@ export async function pickWorktree(
         pad(formatPath(context, entry, widths.path), widths.path),
         pad(formatState(entry), 8),
         pad(formatRole(entry), widths.role),
+        pad(formatSync(entry), 9),
+        pad(formatCount(entry.modifiedCount), 3),
+        pad(formatCount(entry.untrackedCount), 3),
       ].join("  ");
     },
     0,
@@ -317,4 +394,56 @@ export async function pickAgent(defaultAgent: AgentName = "codex"): Promise<Agen
 
 export function isInteractiveSession(): boolean {
   return isInteractive();
+}
+
+export function printCleanupCandidates(context: RepoContext, candidates: CleanupCandidate[]): void {
+  if (candidates.length === 0) {
+    console.log(colorize("No cleanup candidates found.", ansi.dim));
+    return;
+  }
+
+  const widths = getCleanupColumnWidths(context, candidates);
+  const header = [
+    pad("BRANCH", widths.branch),
+    pad("PATH", widths.path),
+    pad("REASON", widths.reason),
+    pad("ACTION", 7),
+  ].join("  ");
+  console.log(colorize(header, ansi.bold));
+  console.log(colorize("-".repeat(header.length), ansi.dim));
+
+  for (const candidate of candidates) {
+    const row = [
+      pad(formatBranch(candidate.entry, widths.branch), widths.branch),
+      pad(formatPath(context, candidate.entry, widths.path), widths.path),
+      pad(getCleanupReason(candidate), widths.reason),
+      pad(formatCleanupAction(candidate), 7),
+    ].join("  ");
+    console.log(row);
+  }
+}
+
+export async function pickCleanupCandidate(
+  context: RepoContext,
+  candidates: CleanupCandidate[],
+): Promise<CleanupCandidate | undefined> {
+  const actionableCandidates = candidates.filter((candidate) => candidate.action !== undefined && !candidate.blockedReason);
+  if (actionableCandidates.length === 0) {
+    return undefined;
+  }
+
+  const widths = getCleanupColumnWidths(context, actionableCandidates);
+  return selectFromMenu(
+    "Clean worktree:",
+    actionableCandidates,
+    (candidate) => {
+      return [
+        pad(formatBranch(candidate.entry, widths.branch), widths.branch),
+        pad(formatPath(context, candidate.entry, widths.path), widths.path),
+        pad(getCleanupReason(candidate), widths.reason),
+        pad(formatCleanupAction(candidate), 7),
+      ].join("  ");
+    },
+    0,
+  );
 }
