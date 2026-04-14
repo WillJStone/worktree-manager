@@ -47,20 +47,18 @@ _wtm() {
       _arguments '--pick[choose a worktree interactively]'
       ;;
     open)
-      if (( CURRENT == 3 )) && [[ "${words[CURRENT]}" != -* ]]; then
-        _wtm_worktree_branches
-        return
-      fi
       _arguments \
         '--agent[choose which agent to launch]:agent:_wtm_agents' \
-        '--no-agent[skip agent launch]'
+        '--no-agent[skip agent launch]' \
+        '1:worktree:_wtm_worktree_branches'
       ;;
     rm)
-      if (( CURRENT == 3 )) && [[ "${words[CURRENT]}" != -* ]]; then
-        _wtm_worktree_branches
-        return
-      fi
-      _arguments '--force[remove even if the worktree is dirty]'
+      _arguments \
+        '--force[remove even if the worktree is dirty]' \
+        '1:worktree:_wtm_worktree_branches'
+      ;;
+    clean)
+      _arguments '--force[remove dirty merged worktrees]'
       ;;
     prune|help)
       ;;

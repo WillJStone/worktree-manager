@@ -143,9 +143,10 @@ export async function runPrune(): Promise<void> {
   console.log("Pruned stale worktree metadata.");
 }
 
-export async function runClean(): Promise<void> {
+export async function runClean(options: CliOptions): Promise<void> {
   const context = resolveRepoContext(process.cwd());
-  const candidates = getCleanupCandidates(context);
+  const force = options.flags.get("force") === true;
+  const candidates = getCleanupCandidates(context, { force });
   printCleanupCandidates(context, candidates);
 
   if (candidates.length === 0) {
@@ -161,7 +162,7 @@ export async function runClean(): Promise<void> {
   if (!selected) {
     const blockedCount = candidates.filter((candidate) => candidate.blockedReason).length;
     if (blockedCount > 0) {
-      console.log("No removable cleanup candidates. Dirty merged worktrees must be removed manually with `wtm rm --force`.");
+      console.log("No removable cleanup candidates. Re-run `wtm clean --force` to remove dirty merged worktrees.");
     }
     return;
   }

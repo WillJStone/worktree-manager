@@ -162,12 +162,21 @@ describe("git helpers", () => {
     run(["git", "merge", "--no-ff", "feature/dirty", "-m", "merge feature/dirty"], repoDir);
     writeFileSync(join(dirtyPath, "dirty.txt"), "changed after merge\n");
 
+    const squashedPath = createWorktree(context, "feature/squashed");
+    writeFileSync(join(squashedPath, "squashed.txt"), "squashed\n");
+    run(["git", "add", "squashed.txt"], squashedPath);
+    run(["git", "commit", "-m", "squashed"], squashedPath);
+    const squashedHead = run(["git", "rev-parse", "HEAD"], squashedPath);
+    run(["git", "checkout", "master"], repoDir);
+    run(["git", "cherry-pick", squashedHead], repoDir);
+
     const prunePath = createWorktree(context, "feature/prunable");
     rmSync(prunePath, { recursive: true, force: true });
 
     const candidates = getCleanupCandidates(context);
     const mergedCandidate = candidates.find((candidate) => candidate.entry.branch === "feature/merged");
     const dirtyCandidate = candidates.find((candidate) => candidate.entry.branch === "feature/dirty");
+    const squashedCandidate = candidates.find((candidate) => candidate.entry.branch === "feature/squashed");
     const prunableCandidate = candidates.find((candidate) => candidate.reason === "prunable");
 
     expect(mergedCandidate?.action).toBe("remove");
@@ -176,7 +185,38 @@ describe("git helpers", () => {
     expect(dirtyCandidate?.reason).toBe("merged");
     expect(dirtyCandidate?.blockedReason).toBe("dirty");
 
+    expect(squashedCandidate?.action).toBe("remove");
+    expect(squashedCandidate?.blockedReason).toBeUndefined();
+
     expect(prunableCandidate?.action).toBe("prune");
+  });
+
+  test("allows forcing dirty merged cleanup candidates", () => {
+    const repoDir = createRepo("master");
+    const context = resolveRepoContext(repoDir);
+
+    const dirtyPath = createWorktree(context, "feature/force-clean");
+    writeFileSync(join(dirtyPath, "dirty.txt"), "dirty\n");
+    run(["git", "add", "dirty.txt"], dirtyPath);
+    run(["git", "commit", "-m", "dirty"], dirtyPath);
+    run(["git", "checkout", "master"], repoDir);
+    run(["git", "merge", "--no-ff", "feature/force-clean", "-m", "merge feature/force-clean"], repoDir);
+    writeFileSync(join(dirtyPath, "dirty.txt"), "changed after merge\n");
+
+    const blockedCandidate = getCleanupCandidates(context).find(
+      (candidate) => candidate.entry.branch === "feature/force-clean",
+    );
+    expect(blockedCandidate?.blockedReason).toBe("dirty");
+
+    const forcedCandidate = getCleanupCandidates(context, { force: true }).find(
+      (candidate) => candidate.entry.branch === "feature/force-clean",
+    );
+    expect(forcedCandidate?.action).toBe("remove");
+    expect(forcedCandidate?.requiresForce).toBe(true);
+    expect(forcedCandidate?.blockedReason).toBeUndefined();
+
+    expect(performCleanupCandidate(context, forcedCandidate!)).toContain("Removed");
+    expect(listWorktrees(context).some((entry) => entry.branch === "feature/force-clean")).toBe(false);
   });
 
   test("removes merged cleanup candidates without deleting branches", () => {

@@ -19,7 +19,7 @@ Usage:
   wtm list [--pick]
   wtm open [branch-slug] [--agent <codex|claude|pi>] [--no-agent]
   wtm rm [branch-slug] [--force]
-  wtm clean
+  wtm clean [--force]
   wtm prune
   wtm completion <worktrees|default-branch> [prefix]
 `);
@@ -67,7 +67,7 @@ async function main(): Promise<void> {
         await runRemove(options);
         break;
       case "clean":
-        await runClean();
+        await runClean(options);
         break;
       case "prune":
         await runPrune();

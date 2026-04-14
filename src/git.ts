@@ -256,11 +256,28 @@ function isMergedIntoDefault(context: RepoContext, branch: string | undefined): 
     return false;
   }
 
-  const result = runGit(
+  const ancestryResult = runGit(
     ["merge-base", "--is-ancestor", branch, context.defaultBranch],
     context.gitRoot,
   );
-  return result.exitCode === 0;
+  if (ancestryResult.exitCode === 0) {
+    return true;
+  }
+
+  // Fall back to patch-equivalence so squash or cherry-pick merges still clean up
+  // once the branch has no unique non-merge commits left relative to the default branch.
+  const patchResult = runGit(
+    [
+      "log",
+      "--cherry-pick",
+      "--right-only",
+      "--no-merges",
+      "--format=%H",
+      `${context.defaultBranch}...${branch}`,
+    ],
+    context.gitRoot,
+  );
+  return patchResult.exitCode === 0 && patchResult.stdout.length === 0;
 }
 
 export function listWorktrees(context: RepoContext): WorktreeEntry[] {
@@ -335,7 +352,10 @@ export function pruneWorktrees(context: RepoContext): string {
   return result.stdout;
 }
 
-export function getCleanupCandidates(context: RepoContext): CleanupCandidate[] {
+export function getCleanupCandidates(
+  context: RepoContext,
+  options: { force?: boolean } = {},
+): CleanupCandidate[] {
   return listWorktrees(context)
     .filter((entry) => entry.prunable || entry.mergedIntoDefault)
     .map((entry) => {
@@ -348,6 +368,15 @@ export function getCleanupCandidates(context: RepoContext): CleanupCandidate[] {
       }
 
       if (entry.isDirty) {
+        if (options.force) {
+          return {
+            entry,
+            action: "remove",
+            reason: "merged",
+            requiresForce: true,
+          };
+        }
+
         return {
           entry,
           reason: "merged",
@@ -369,7 +398,7 @@ export function performCleanupCandidate(context: RepoContext, candidate: Cleanup
   }
 
   if (candidate.action === "remove") {
-    removeWorktree(context, candidate.entry);
+    removeWorktree(context, candidate.entry, { force: candidate.requiresForce === true });
     pruneWorktrees(context);
     return `Removed ${relative(context.gitRoot, candidate.entry.path) || candidate.entry.path}`;
   }

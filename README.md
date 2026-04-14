@@ -121,7 +121,9 @@ wtm prune
 wtm clean
 ```
 
-`clean` shows merged and stale cleanup candidates, lets you choose one actionable candidate interactively, removes only the worktree, and then runs prune.
+`clean` shows merged and stale cleanup candidates, including branches whose changes were already integrated into the default branch via equivalent commits, lets you choose one actionable candidate interactively, removes only the worktree, and then runs prune.
+
+Use `wtm clean --force` to also remove merged worktrees that still have local modifications.
 
 ## Command reference
 
@@ -130,7 +132,7 @@ wtm new <branch-slug> [--agent <codex|claude|pi>] [--no-agent]
 wtm list [--pick]
 wtm open [branch-slug] [--agent <codex|claude|pi>] [--no-agent]
 wtm rm [branch-slug] [--force]
-wtm clean
+wtm clean [--force]
 wtm prune
 ```
 

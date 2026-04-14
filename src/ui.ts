@@ -133,6 +133,10 @@ function formatCleanupAction(candidate: CleanupCandidate): string {
     return colorize("BLOCKED", ansi.red);
   }
 
+  if (candidate.requiresForce) {
+    return colorize("FORCE", ansi.yellow);
+  }
+
   if (candidate.action === "prune") {
     return colorize("PRUNE", ansi.yellow);
   }

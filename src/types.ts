@@ -31,5 +31,6 @@ export interface CleanupCandidate {
   entry: WorktreeEntry;
   action?: CleanupAction;
   reason: CleanupReason;
+  requiresForce?: boolean;
   blockedReason?: string;
 }
