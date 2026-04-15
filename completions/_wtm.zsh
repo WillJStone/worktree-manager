@@ -38,10 +38,29 @@ _wtm() {
 
   case "${words[2]}" in
     new)
-      _arguments \
-        '--agent[choose which agent to launch]:agent:_wtm_agents' \
-        '--no-agent[skip agent launch]' \
-        '1:branch slug: '
+      local has_issue=0
+      local word
+
+      for word in "${words[@]}"; do
+        if [[ "$word" == "--issue" ]]; then
+          has_issue=1
+          break
+        fi
+      done
+
+      if (( has_issue )); then
+        _arguments \
+          '--agent[choose which agent to launch]:agent:_wtm_agents' \
+          '--no-agent[skip agent launch]' \
+          '--issue[create a worktree from a Linear issue]::issue id: ' \
+          '--workspace[target Linear workspace]:workspace slug: '
+      else
+        _arguments \
+          '--agent[choose which agent to launch]:agent:_wtm_agents' \
+          '--no-agent[skip agent launch]' \
+          '--issue[create a worktree from a Linear issue]::issue id: ' \
+          '1:branch slug: '
+      fi
       ;;
     list)
       _arguments '--pick[choose a worktree interactively]'

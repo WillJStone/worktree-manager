@@ -6,6 +6,7 @@ It is intentionally dependency-free at runtime. The CLI uses Bun plus Node built
 
 It detects the current Git root automatically, creates worktrees in `.claude/worktrees`, and provides a small command set for the common lifecycle:
 - create a worktree from the repo default branch
+- create a worktree from a Linear issue with an auto-generated branch name
 - list worktrees in readable columns
 - open an existing worktree
 - remove a worktree safely
@@ -16,6 +17,7 @@ It detects the current Git root automatically, creates worktrees in `.claude/wor
 - `git`
 - `bun`
 - optional: `codex`, `claude`, or `pi` on your `PATH` if you want launcher support after `new` and `open`
+- optional: `linear` on your `PATH` if you want to create worktrees from Linear issues
 
 ## Setup
 
@@ -79,6 +81,26 @@ This will:
 - create a worktree at `.claude/worktrees/feature--my-branch`
 - offer to launch `codex`, `claude`, or `pi`
 
+### Create a worktree from a Linear issue
+
+```bash
+wtm new --issue
+```
+
+In an interactive shell this opens a picker of open Linear issues in the workspace, generates a branch name like `feature/bou-123-add-picker-support`, creates the worktree, and then offers to launch an agent.
+
+You can also skip the picker and create directly from an issue key:
+
+```bash
+wtm new --issue BOU-123
+```
+
+If you need to target a non-default Linear workspace:
+
+```bash
+wtm new --issue BOU-123 --workspace boundlessdiscovery
+```
+
 ### List worktrees
 
 ```bash
@@ -129,6 +151,7 @@ Use `wtm clean --force` to also remove merged worktrees that still have local mo
 
 ```bash
 wtm new <branch-slug> [--agent <codex|claude|pi>] [--no-agent]
+wtm new --issue [issue-id] [--workspace <slug>] [--agent <codex|claude|pi>] [--no-agent]
 wtm list [--pick]
 wtm open [branch-slug] [--agent <codex|claude|pi>] [--no-agent]
 wtm rm [branch-slug] [--force]

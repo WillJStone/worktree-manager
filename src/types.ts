@@ -3,6 +3,14 @@ export type AgentName = "codex" | "claude" | "pi";
 export type CleanupAction = "remove" | "prune";
 export type CleanupReason = "merged" | "prunable";
 
+export interface LinearIssue {
+  identifier: string;
+  title: string;
+  url: string;
+  stateName: string;
+  stateType: string;
+}
+
 export interface RepoContext {
   gitRoot: string;
   defaultBranch: string;

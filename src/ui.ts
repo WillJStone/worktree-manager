@@ -1,5 +1,11 @@
 import { relative } from "node:path";
-import type { AgentName, CleanupCandidate, RepoContext, WorktreeEntry } from "./types";
+import type {
+  AgentName,
+  CleanupCandidate,
+  LinearIssue,
+  RepoContext,
+  WorktreeEntry,
+} from "./types";
 
 const ansi = {
   reset: "\u001b[0m",
@@ -120,6 +126,23 @@ function formatCount(value: number): string {
   return String(value);
 }
 
+function formatIssueState(issue: LinearIssue): string {
+  switch (issue.stateType) {
+    case "started":
+      return colorize(issue.stateName, ansi.green);
+    case "unstarted":
+    case "backlog":
+    case "triage":
+      return colorize(issue.stateName, ansi.yellow);
+    case "completed":
+      return colorize(issue.stateName, ansi.dim);
+    case "canceled":
+      return colorize(issue.stateName, ansi.red);
+    default:
+      return issue.stateName;
+  }
+}
+
 function getCleanupReason(candidate: CleanupCandidate): string {
   if (candidate.reason === "prunable") {
     return "stale metadata";
@@ -162,6 +185,25 @@ function getColumnWidths(context: RepoContext, entries: WorktreeEntry[]): {
     branch: Math.min(branch, 32),
     path: Math.min(path, 56),
     role: "KIND".length,
+  };
+}
+
+function getIssueColumnWidths(issues: LinearIssue[]): {
+  identifier: number;
+  title: number;
+  state: number;
+} {
+  const identifier = Math.max(
+    "ISSUE".length,
+    ...issues.map((issue) => issue.identifier.length),
+  );
+  const title = Math.max("TITLE".length, ...issues.map((issue) => issue.title.length));
+  const state = Math.max("STATE".length, ...issues.map((issue) => issue.stateName.length));
+
+  return {
+    identifier: Math.min(identifier, 12),
+    title: Math.min(title, 64),
+    state: Math.min(state, 16),
   };
 }
 
@@ -393,6 +435,24 @@ export async function pickAgent(defaultAgent: AgentName = "codex"): Promise<Agen
       return agent;
     },
     defaultIndex === -1 ? 0 : defaultIndex,
+  );
+}
+
+export async function pickLinearIssue(
+  issues: LinearIssue[],
+): Promise<LinearIssue | undefined> {
+  const widths = getIssueColumnWidths(issues);
+  return selectFromMenu(
+    "Create worktree from Linear issue:",
+    issues,
+    (issue) => {
+      return [
+        pad(issue.identifier, widths.identifier),
+        pad(truncate(issue.title, widths.title), widths.title),
+        pad(formatIssueState(issue), widths.state),
+      ].join("  ");
+    },
+    0,
   );
 }
 

@@ -16,6 +16,7 @@ function printHelp(): void {
 
 Usage:
   wtm new <branch-slug> [--agent <codex|claude|pi>] [--no-agent]
+  wtm new --issue [issue-id] [--workspace <slug>] [--agent <codex|claude|pi>] [--no-agent]
   wtm list [--pick]
   wtm open [branch-slug] [--agent <codex|claude|pi>] [--no-agent]
   wtm rm [branch-slug] [--force]

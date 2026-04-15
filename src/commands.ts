@@ -10,12 +10,18 @@ import {
   removeWorktree,
   resolveRepoContext,
 } from "./git";
+import {
+  branchSlugForLinearIssue,
+  getLinearIssue,
+  listOpenLinearIssues,
+} from "./linear";
 import { launchAgent } from "./launch";
-import type { AgentName, WorktreeEntry } from "./types";
+import type { AgentName, LinearIssue, WorktreeEntry } from "./types";
 import {
   isInteractiveSession,
   pickAgent,
   pickCleanupCandidate,
+  pickLinearIssue,
   pickWorktree,
   printCleanupCandidates,
   printWorktrees,
@@ -25,6 +31,9 @@ export interface CliOptions {
   args: string[];
   flags: Map<string, string | boolean>;
 }
+
+const NEW_USAGE =
+  "Usage: wtm new <branch-slug> | wtm new --issue [issue-id] [--workspace <slug>]";
 
 function getAgentFromFlags(flags: Map<string, string | boolean>): AgentName | undefined {
   const value = flags.get("agent");
@@ -37,6 +46,22 @@ function getAgentFromFlags(flags: Map<string, string | boolean>): AgentName | un
   }
 
   throw new Error(`Unsupported agent '${value}'. Use codex, claude, or pi.`);
+}
+
+function getOptionalStringFlag(
+  flags: Map<string, string | boolean>,
+  key: string,
+): string | undefined {
+  const value = flags.get(key);
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new Error(`Flag '--${key}' requires a value.`);
+  }
+
+  return value;
 }
 
 async function maybeLaunch(
@@ -81,10 +106,52 @@ function requireTarget(
   throw new Error(`No worktree selected for ${action}.`);
 }
 
+async function resolveLinearIssue(
+  issueFlag: string | boolean,
+  workspace: string | undefined,
+): Promise<LinearIssue | undefined> {
+  if (typeof issueFlag === "string") {
+    return getLinearIssue(issueFlag, { workspace });
+  }
+
+  if (!isInteractiveSession()) {
+    throw new Error("--issue requires an issue key in non-interactive shells.");
+  }
+
+  const issues = listOpenLinearIssues({ workspace });
+  if (issues.length === 0) {
+    console.log("No open Linear issues found.");
+    return undefined;
+  }
+
+  return pickLinearIssue(issues);
+}
+
 export async function runNew(options: CliOptions): Promise<void> {
-  const branchSlug = options.args[0];
+  const manualBranchSlug = options.args[0];
+  const issueFlag = options.flags.get("issue");
+  const workspace = getOptionalStringFlag(options.flags, "workspace");
+
+  if (workspace !== undefined && issueFlag === undefined) {
+    throw new Error("`--workspace` can only be used with `--issue`.");
+  }
+
+  if (issueFlag !== undefined && manualBranchSlug !== undefined) {
+    throw new Error(NEW_USAGE);
+  }
+
+  let branchSlug = manualBranchSlug;
+  if (issueFlag !== undefined) {
+    const issue = await resolveLinearIssue(issueFlag, workspace);
+    if (!issue) {
+      return;
+    }
+
+    branchSlug = branchSlugForLinearIssue(issue);
+  }
+
   if (!branchSlug) {
-    throw new Error("Usage: wtm new <branch-slug>");
+    throw new Error(NEW_USAGE);
   }
 
   const context = resolveRepoContext(process.cwd());
