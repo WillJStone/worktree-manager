@@ -52,12 +52,14 @@ _wtm() {
         _arguments \
           '--agent[choose which agent to launch]:agent:_wtm_agents' \
           '--no-agent[skip agent launch]' \
+          '--yolo[launch claude with --dangerously-skip-permissions]' \
           '--issue[create a worktree from a Linear issue]::issue id: ' \
           '--workspace[target Linear workspace]:workspace slug: '
       else
         _arguments \
           '--agent[choose which agent to launch]:agent:_wtm_agents' \
           '--no-agent[skip agent launch]' \
+          '--yolo[launch claude with --dangerously-skip-permissions]' \
           '--issue[create a worktree from a Linear issue]::issue id: ' \
           '1:branch slug: '
       fi
@@ -69,6 +71,7 @@ _wtm() {
       _arguments \
         '--agent[choose which agent to launch]:agent:_wtm_agents' \
         '--no-agent[skip agent launch]' \
+        '--yolo[launch claude with --dangerously-skip-permissions]' \
         '1:worktree:_wtm_worktree_branches'
       ;;
     rm)

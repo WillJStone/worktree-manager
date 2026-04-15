@@ -1,6 +1,14 @@
 import type { AgentName } from "./types";
 
-export async function launchAgent(agent: AgentName, cwd: string): Promise<void> {
+export interface LaunchOptions {
+  yolo?: boolean;
+}
+
+export async function launchAgent(
+  agent: AgentName,
+  cwd: string,
+  options: LaunchOptions = {},
+): Promise<void> {
   if (agent === "nothing") {
     return;
   }
@@ -17,8 +25,13 @@ export async function launchAgent(agent: AgentName, cwd: string): Promise<void> 
     throw new Error(`Launcher '${command}' is not available on PATH.`);
   }
 
+  const args: string[] = [];
+  if (options.yolo && agent === "claude") {
+    args.push("--dangerously-skip-permissions");
+  }
+
   const proc = Bun.spawn({
-    cmd: [command],
+    cmd: [command, ...args],
     cwd,
     stdin: "inherit",
     stdout: "inherit",

@@ -15,10 +15,10 @@ function printHelp(): void {
   console.log(`wtm - worktree manager
 
 Usage:
-  wtm new <branch-slug> [--agent <codex|claude|pi>] [--no-agent]
-  wtm new --issue [issue-id] [--workspace <slug>] [--agent <codex|claude|pi>] [--no-agent]
+  wtm new <branch-slug> [--agent <codex|claude|pi>] [--no-agent] [--yolo]
+  wtm new --issue [issue-id] [--workspace <slug>] [--agent <codex|claude|pi>] [--no-agent] [--yolo]
   wtm list [--pick]
-  wtm open [branch-slug] [--agent <codex|claude|pi>] [--no-agent]
+  wtm open [branch-slug] [--agent <codex|claude|pi>] [--no-agent] [--yolo]
   wtm rm [branch-slug] [--force]
   wtm clean [--force]
   wtm prune

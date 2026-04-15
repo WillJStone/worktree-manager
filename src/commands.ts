@@ -73,9 +73,11 @@ async function maybeLaunch(
     return;
   }
 
+  const yolo = flags.get("yolo") === true;
+
   const requested = getAgentFromFlags(flags);
   if (requested) {
-    await launchAgent(requested, path);
+    await launchAgent(requested, path, { yolo });
     return;
   }
 
@@ -87,7 +89,7 @@ async function maybeLaunch(
   if (selected === undefined) {
     return;
   }
-  await launchAgent(selected, path);
+  await launchAgent(selected, path, { yolo });
 }
 
 function requireTarget(
