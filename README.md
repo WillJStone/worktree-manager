@@ -159,7 +159,7 @@ wtm clean [--force]
 wtm prune
 ```
 
-Pass `--yolo` to `new` or `open` to launch Claude with `--dangerously-skip-permissions`. This is intended for disposable worktree sandboxes; only use it in repos where an unattended agent is acceptable. The flag is a no-op for other agents.
+Pass `--yolo` to `new` or `open` to launch Codex with `--full-auto` or Claude with `--dangerously-skip-permissions`. This is intended for disposable worktree sandboxes; only use it in repos where an unattended agent is acceptable. The flag is a no-op for `pi`.
 
 ## Notes
 

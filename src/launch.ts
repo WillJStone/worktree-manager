@@ -4,6 +4,25 @@ export interface LaunchOptions {
   yolo?: boolean;
 }
 
+export function getAgentLaunchArgs(
+  agent: AgentName,
+  options: LaunchOptions = {},
+): string[] {
+  if (!options.yolo) {
+    return [];
+  }
+
+  if (agent === "claude") {
+    return ["--dangerously-skip-permissions"];
+  }
+
+  if (agent === "codex") {
+    return ["--full-auto"];
+  }
+
+  return [];
+}
+
 export async function launchAgent(
   agent: AgentName,
   cwd: string,
@@ -25,13 +44,8 @@ export async function launchAgent(
     throw new Error(`Launcher '${command}' is not available on PATH.`);
   }
 
-  const args: string[] = [];
-  if (options.yolo && agent === "claude") {
-    args.push("--dangerously-skip-permissions");
-  }
-
   const proc = Bun.spawn({
-    cmd: [command, ...args],
+    cmd: [command, ...getAgentLaunchArgs(agent, options)],
     cwd,
     stdin: "inherit",
     stdout: "inherit",
