@@ -104,13 +104,69 @@ export function branchExists(context: RepoContext, branchSlug: string): boolean 
   ).exitCode === 0;
 }
 
-export function createWorktree(context: RepoContext, branchSlug: string): string {
-  if (branchExists(context, branchSlug)) {
-    throw new Error(`Branch '${branchSlug}' already exists.`);
+function findWorktreePathForBranch(
+  context: RepoContext,
+  branchSlug: string,
+): string | undefined {
+  const result = runGit(["worktree", "list", "--porcelain"], context.gitRoot);
+  if (result.exitCode !== 0) {
+    return undefined;
   }
 
+  const blocks = result.stdout.split("\n\n").map((block) => block.trim()).filter(Boolean);
+  for (const block of blocks) {
+    let path: string | undefined;
+    let branch: string | undefined;
+    for (const line of block.split("\n")) {
+      const [key, ...rest] = line.split(" ");
+      const value = rest.join(" ").trim();
+      if (key === "worktree") {
+        path = value;
+      } else if (key === "branch") {
+        branch = value.replace("refs/heads/", "");
+      }
+    }
+    if (branch === branchSlug && path) {
+      return path;
+    }
+  }
+
+  return undefined;
+}
+
+export function createWorktree(context: RepoContext, branchSlug: string): string {
   ensureWorktreeRoot(context);
   const worktreePath = worktreePathForBranch(context, branchSlug);
+
+  if (branchExists(context, branchSlug)) {
+    // Clean stale worktree metadata so an orphan branch (dir deleted out from under wtm)
+    // doesn't look like it's still checked out somewhere.
+    runGit(["worktree", "prune"], context.gitRoot);
+
+    const existingWorktree = findWorktreePathForBranch(context, branchSlug);
+    if (existingWorktree) {
+      throw new Error(
+        `Branch '${branchSlug}' is already checked out at ${existingWorktree}.`,
+      );
+    }
+
+    if (existsSync(worktreePath)) {
+      throw new Error(`Worktree path already exists: ${worktreePath}`);
+    }
+
+    // Orphan branch (ref exists, no worktree attached): reattach to a fresh worktree
+    // at the canonical path instead of erroring out.
+    const reattach = runGit(
+      ["worktree", "add", worktreePath, branchSlug],
+      context.gitRoot,
+    );
+    if (reattach.exitCode !== 0) {
+      throw new Error(
+        reattach.stderr || `Failed to reattach worktree for '${branchSlug}'.`,
+      );
+    }
+    return worktreePath;
+  }
 
   if (existsSync(worktreePath)) {
     throw new Error(`Worktree path already exists: ${worktreePath}`);

@@ -219,6 +219,34 @@ describe("git helpers", () => {
     expect(listWorktrees(context).some((entry) => entry.branch === "feature/force-clean")).toBe(false);
   });
 
+  test("reattaches an orphan branch whose worktree directory was deleted", () => {
+    const repoDir = createRepo("master");
+    const context = resolveRepoContext(repoDir);
+
+    const originalPath = createWorktree(context, "feature/orphan");
+    rmSync(originalPath, { recursive: true, force: true });
+
+    // Branch ref still exists, but the worktree directory is gone.
+    expect(runExitCode(["git", "show-ref", "--verify", "--quiet", "refs/heads/feature/orphan"], repoDir)).toBe(0);
+
+    const reattachedPath = createWorktree(context, "feature/orphan");
+    expect(reattachedPath).toBe(originalPath);
+
+    const entries = listWorktrees(context);
+    const entry = entries.find((candidate) => candidate.branch === "feature/orphan");
+    expect(entry).toBeDefined();
+    expect(entry?.path).toBe(reattachedPath);
+  });
+
+  test("refuses to create a worktree when the branch is already checked out elsewhere", () => {
+    const repoDir = createRepo("master");
+    const context = resolveRepoContext(repoDir);
+
+    createWorktree(context, "feature/in-use");
+
+    expect(() => createWorktree(context, "feature/in-use")).toThrow(/already checked out/);
+  });
+
   test("removes merged cleanup candidates without deleting branches", () => {
     const repoDir = createRepo("master");
     const context = resolveRepoContext(repoDir);
