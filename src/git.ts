@@ -333,7 +333,73 @@ function isMergedIntoDefault(context: RepoContext, branch: string | undefined): 
     ],
     context.gitRoot,
   );
-  return patchResult.exitCode === 0 && patchResult.stdout.length === 0;
+  if (patchResult.exitCode === 0 && patchResult.stdout.length === 0) {
+    return true;
+  }
+
+  // Multi-commit squash merges defeat per-commit patch-equivalence: the squash
+  // commit's patch-id matches the branch's combined diff, not any individual
+  // branch commit. Compute the combined patch-id and look for a match among
+  // default's commits since the merge-base.
+  return isSquashMergedIntoDefault(context, branch);
+}
+
+function isSquashMergedIntoDefault(context: RepoContext, branch: string): boolean {
+  const baseResult = runGit(["merge-base", context.defaultBranch, branch], context.gitRoot);
+  if (baseResult.exitCode !== 0 || !baseResult.stdout) {
+    return false;
+  }
+  const base = baseResult.stdout;
+
+  const combinedPatchId = computePatchId(["diff", `${base}..${branch}`], context.gitRoot);
+  if (!combinedPatchId) {
+    return false;
+  }
+
+  const commitListResult = runGit(
+    ["rev-list", `${base}..${context.defaultBranch}`],
+    context.gitRoot,
+  );
+  if (commitListResult.exitCode !== 0) {
+    return false;
+  }
+
+  const commits = commitListResult.stdout.split("\n").filter(Boolean);
+  for (const commit of commits) {
+    const commitPatchId = computePatchId(["show", commit], context.gitRoot);
+    if (commitPatchId && commitPatchId === combinedPatchId) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function computePatchId(gitArgs: string[], cwd: string): string | null {
+  const diffProc = Bun.spawnSync({
+    cmd: ["git", ...gitArgs],
+    cwd,
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  if (diffProc.exitCode !== 0 || !diffProc.stdout || diffProc.stdout.length === 0) {
+    return null;
+  }
+
+  const patchIdProc = Bun.spawnSync({
+    cmd: ["git", "patch-id", "--stable"],
+    cwd,
+    stdin: diffProc.stdout,
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  if (patchIdProc.exitCode !== 0 || !patchIdProc.stdout) {
+    return null;
+  }
+
+  const output = new TextDecoder().decode(patchIdProc.stdout).trim();
+  const [patchId] = output.split(/\s+/);
+  return patchId || null;
 }
 
 export function listWorktrees(context: RepoContext): WorktreeEntry[] {
