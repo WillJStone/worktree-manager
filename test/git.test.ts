@@ -191,6 +191,31 @@ describe("git helpers", () => {
     expect(prunableCandidate?.action).toBe("prune");
   });
 
+  test("classifies multi-commit squash merges as merged cleanup candidates", () => {
+    const repoDir = createRepo("master");
+    const context = resolveRepoContext(repoDir);
+
+    const squashedPath = createWorktree(context, "feature/multi-squashed");
+    writeFileSync(join(squashedPath, "first.txt"), "first\n");
+    run(["git", "add", "first.txt"], squashedPath);
+    run(["git", "commit", "-m", "first"], squashedPath);
+    writeFileSync(join(squashedPath, "second.txt"), "second\n");
+    run(["git", "add", "second.txt"], squashedPath);
+    run(["git", "commit", "-m", "second"], squashedPath);
+
+    run(["git", "checkout", "master"], repoDir);
+    run(["git", "merge", "--squash", "feature/multi-squashed"], repoDir);
+    run(["git", "commit", "-m", "squash merge feature/multi-squashed"], repoDir);
+
+    const candidate = getCleanupCandidates(context).find(
+      (entry) => entry.entry.branch === "feature/multi-squashed",
+    );
+
+    expect(candidate?.action).toBe("remove");
+    expect(candidate?.reason).toBe("merged");
+    expect(candidate?.blockedReason).toBeUndefined();
+  });
+
   test("allows forcing dirty merged cleanup candidates", () => {
     const repoDir = createRepo("master");
     const context = resolveRepoContext(repoDir);
