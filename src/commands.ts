@@ -1,4 +1,5 @@
 import { relative } from "node:path";
+import { getAgentByName, getAgentNames, loadAgents, type AgentDefinition } from "./agents";
 import {
   createWorktree,
   detectDefaultBranch,
@@ -16,7 +17,7 @@ import {
   listOpenLinearIssues,
 } from "./linear";
 import { launchAgent } from "./launch";
-import type { AgentName, LinearIssue, WorktreeEntry } from "./types";
+import type { LinearIssue, WorktreeEntry } from "./types";
 import {
   isInteractiveSession,
   pickAgent,
@@ -35,17 +36,21 @@ export interface CliOptions {
 const NEW_USAGE =
   "Usage: wtm new <branch-slug> | wtm new --issue [issue-id] [--workspace <slug>]";
 
-function getAgentFromFlags(flags: Map<string, string | boolean>): AgentName | undefined {
+function getAgentFromFlags(
+  flags: Map<string, string | boolean>,
+  agents: AgentDefinition[],
+): AgentDefinition | undefined {
   const value = flags.get("agent");
   if (typeof value !== "string") {
     return undefined;
   }
 
-  if (value === "codex" || value === "claude" || value === "pi") {
-    return value;
+  const agent = getAgentByName(agents, value);
+  if (agent) {
+    return agent;
   }
 
-  throw new Error(`Unsupported agent '${value}'. Use codex, claude, or pi.`);
+  throw new Error(`Unsupported agent '${value}'. Use one of: ${getAgentNames(agents).join(", ")}.`);
 }
 
 function getOptionalStringFlag(
@@ -67,15 +72,16 @@ function getOptionalStringFlag(
 async function maybeLaunch(
   path: string,
   flags: Map<string, string | boolean>,
-  defaultAgent: AgentName,
+  defaultAgentName: string,
 ): Promise<void> {
   if (flags.get("no-agent") === true) {
     return;
   }
 
   const yolo = flags.get("yolo") === true;
+  const agents = loadAgents();
 
-  const requested = getAgentFromFlags(flags);
+  const requested = getAgentFromFlags(flags, agents);
   if (requested) {
     await launchAgent(requested, path, { yolo });
     return;
@@ -85,7 +91,7 @@ async function maybeLaunch(
     return;
   }
 
-  const selected = await pickAgent(defaultAgent);
+  const selected = await pickAgent(agents, defaultAgentName);
   if (selected === undefined) {
     return;
   }
@@ -260,6 +266,13 @@ export async function runCompletion(options: CliOptions): Promise<void> {
         if (branch.startsWith(prefix)) {
           console.log(branch);
         }
+        break;
+      }
+      case "agents": {
+        const agents = loadAgents()
+          .map((agent) => agent.name)
+          .filter((name) => name.startsWith(prefix));
+        console.log(agents.join("\n"));
         break;
       }
       default:

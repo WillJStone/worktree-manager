@@ -1,51 +1,23 @@
-import type { AgentName } from "./types";
-
-export interface LaunchOptions {
-  yolo?: boolean;
-}
-
-export function getAgentLaunchArgs(
-  agent: AgentName,
-  options: LaunchOptions = {},
-): string[] {
-  if (!options.yolo) {
-    return [];
-  }
-
-  if (agent === "claude") {
-    return ["--dangerously-skip-permissions"];
-  }
-
-  if (agent === "codex") {
-    return ["--full-auto"];
-  }
-
-  return [];
-}
+import { getAgentLaunchArgs, type AgentDefinition, type LaunchOptions } from "./agents";
 
 export async function launchAgent(
-  agent: AgentName,
+  agent: AgentDefinition,
   cwd: string,
   options: LaunchOptions = {},
 ): Promise<void> {
-  if (agent === "nothing") {
-    return;
-  }
-
-  const command = agent;
   const whichResult = Bun.spawnSync({
-    cmd: ["which", command],
+    cmd: ["which", agent.command],
     cwd,
     stdout: "pipe",
     stderr: "pipe",
   });
 
   if (whichResult.exitCode !== 0) {
-    throw new Error(`Launcher '${command}' is not available on PATH.`);
+    throw new Error(`Launcher '${agent.command}' is not available on PATH.`);
   }
 
   const proc = Bun.spawn({
-    cmd: [command, ...getAgentLaunchArgs(agent, options)],
+    cmd: [agent.command, ...getAgentLaunchArgs(agent, options)],
     cwd,
     stdin: "inherit",
     stdout: "inherit",
@@ -54,6 +26,6 @@ export async function launchAgent(
 
   const exitCode = await proc.exited;
   if (exitCode !== 0) {
-    throw new Error(`Launcher '${command}' exited with code ${exitCode}.`);
+    throw new Error(`Launcher '${agent.command}' exited with code ${exitCode}.`);
   }
 }

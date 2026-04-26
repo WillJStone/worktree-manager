@@ -17,13 +17,17 @@ _wtm_worktree_branches() {
 }
 
 _wtm_agents() {
+  local output
+  output="$(wtm completion agents "$PREFIX" 2>/dev/null)" || return 1
+  if [[ -z "$output" ]]; then
+    return 0
+  fi
+
   local -a agents
-  agents=(
-    'codex:launch Codex'
-    'claude:launch Claude'
-    'pi:launch Pi'
-  )
-  _describe 'agent' agents
+  agents=("${(@f)output}")
+  agents=("${(@)agents:#}")
+  (( ${#agents[@]} == 0 )) && return 0
+  compadd -- "${agents[@]}"
 }
 
 _wtm_new() {
@@ -49,14 +53,14 @@ _wtm_new() {
     _arguments -A '-*' \
       '--agent[choose which agent to launch]:agent:_wtm_agents' \
       '--no-agent[skip agent launch]' \
-      '--yolo[launch codex with --full-auto or claude with --dangerously-skip-permissions]' \
+      '--yolo[launch the selected agent with its configured yolo args]' \
       '--issue[create a worktree from a Linear issue]::issue id: ' \
       '--workspace[target Linear workspace]:workspace slug: '
   else
     _arguments -A '-*' \
       '--agent[choose which agent to launch]:agent:_wtm_agents' \
       '--no-agent[skip agent launch]' \
-      '--yolo[launch codex with --full-auto or claude with --dangerously-skip-permissions]' \
+      '--yolo[launch the selected agent with its configured yolo args]' \
       '--issue[create a worktree from a Linear issue]::issue id: ' \
       '1:branch slug: '
   fi
@@ -75,7 +79,7 @@ _wtm_open() {
   _arguments -C -A '-*' \
     '--agent[choose which agent to launch]:agent:_wtm_agents' \
     '--no-agent[skip agent launch]' \
-    '--yolo[launch codex with --full-auto or claude with --dangerously-skip-permissions]' \
+    '--yolo[launch the selected agent with its configured yolo args]' \
     '1:worktree:->worktree' \
     && return 0
 

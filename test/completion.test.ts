@@ -79,7 +79,7 @@ describe("zsh completions", () => {
 
   test("new without --issue advertises --yolo", () => {
     const args = captureArguments(["wtm", "new"], 3);
-    expect(args).toContain("--yolo[launch codex with --full-auto or claude with --dangerously-skip-permissions]");
+    expect(args).toContain("--yolo[launch the selected agent with its configured yolo args]");
   });
 
   test("new with --issue removes the positional branch slug and offers workspace", () => {
@@ -90,14 +90,14 @@ describe("zsh completions", () => {
 
   test("new with --issue advertises --yolo", () => {
     const args = captureArguments(["wtm", "new", "--issue"], 4);
-    expect(args).toContain("--yolo[launch codex with --full-auto or claude with --dangerously-skip-permissions]");
+    expect(args).toContain("--yolo[launch the selected agent with its configured yolo args]");
   });
 
   test("open advertises --yolo and branches completer", () => {
     const args = captureArguments(["wtm", "open"], 3);
     expect(args).toContain("-A");
     expect(args).toContain("-*");
-    expect(args).toContain("--yolo[launch codex with --full-auto or claude with --dangerously-skip-permissions]");
+    expect(args).toContain("--yolo[launch the selected agent with its configured yolo args]");
     expect(args).toContain("1:worktree:->worktree");
   });
 

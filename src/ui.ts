@@ -1,6 +1,6 @@
 import { relative } from "node:path";
+import type { AgentDefinition } from "./agents";
 import type {
-  AgentName,
   CleanupCandidate,
   LinearIssue,
   RepoContext,
@@ -421,18 +421,21 @@ export async function pickWorktree(
   );
 }
 
-export async function pickAgent(defaultAgent: AgentName = "codex"): Promise<AgentName | undefined> {
-  const agents: AgentName[] = ["codex", "claude", "pi"];
-  const defaultIndex = agents.indexOf(defaultAgent);
+export async function pickAgent(
+  agents: AgentDefinition[],
+  defaultAgentName = "codex",
+): Promise<AgentDefinition | undefined> {
+  const defaultIndex = agents.findIndex((agent) => agent.name === defaultAgentName);
   return selectFromMenu(
     "Launch agent:",
     agents,
     (agent) => {
-      if (agent === defaultAgent) {
-        return `${colorize(agent, ansi.cyan)} ${colorize("(default)", ansi.dim)}`;
+      const label = agent.label === agent.name ? agent.name : `${agent.name} (${agent.label})`;
+      if (agent.name === defaultAgentName) {
+        return `${colorize(label, ansi.cyan)} ${colorize("(default)", ansi.dim)}`;
       }
 
-      return agent;
+      return label;
     },
     defaultIndex === -1 ? 0 : defaultIndex,
   );

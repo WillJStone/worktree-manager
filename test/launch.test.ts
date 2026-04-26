@@ -1,24 +1,20 @@
 import { describe, expect, test } from "bun:test";
-import { getAgentLaunchArgs } from "../src/launch";
+import { BUILTIN_AGENTS, getAgentByName, getAgentLaunchArgs } from "../src/agents";
 
 describe("getAgentLaunchArgs", () => {
   test("returns no extra flags without yolo", () => {
-    expect(getAgentLaunchArgs("codex")).toEqual([]);
-    expect(getAgentLaunchArgs("claude")).toEqual([]);
-    expect(getAgentLaunchArgs("pi")).toEqual([]);
+    expect(getAgentLaunchArgs(getAgentByName(BUILTIN_AGENTS, "codex")!)).toEqual([]);
+    expect(getAgentLaunchArgs(getAgentByName(BUILTIN_AGENTS, "claude")!)).toEqual([]);
   });
 
   test("adds Codex full-auto when yolo is enabled", () => {
-    expect(getAgentLaunchArgs("codex", { yolo: true })).toEqual(["--full-auto"]);
+    expect(getAgentLaunchArgs(getAgentByName(BUILTIN_AGENTS, "codex")!, { yolo: true })).toEqual(["--full-auto"]);
   });
 
   test("adds Claude skip-permissions when yolo is enabled", () => {
-    expect(getAgentLaunchArgs("claude", { yolo: true })).toEqual([
+    expect(getAgentLaunchArgs(getAgentByName(BUILTIN_AGENTS, "claude")!, { yolo: true })).toEqual([
       "--dangerously-skip-permissions",
     ]);
   });
 
-  test("leaves Pi unchanged when yolo is enabled", () => {
-    expect(getAgentLaunchArgs("pi", { yolo: true })).toEqual([]);
-  });
 });

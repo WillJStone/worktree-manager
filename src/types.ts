@@ -1,5 +1,3 @@
-export type AgentName = "codex" | "claude" | "pi";
-
 export type CleanupAction = "remove" | "prune";
 export type CleanupReason = "merged" | "prunable";
 

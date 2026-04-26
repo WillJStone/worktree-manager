@@ -15,14 +15,14 @@ function printHelp(): void {
   console.log(`wtm - worktree manager
 
 Usage:
-  wtm new <branch-slug> [--agent <codex|claude|pi>] [--no-agent] [--yolo]
-  wtm new --issue [issue-id] [--workspace <slug>] [--agent <codex|claude|pi>] [--no-agent] [--yolo]
+  wtm new <branch-slug> [--agent <name>] [--no-agent] [--yolo]
+  wtm new --issue [issue-id] [--workspace <slug>] [--agent <name>] [--no-agent] [--yolo]
   wtm list [--pick]
-  wtm open [branch-slug] [--agent <codex|claude|pi>] [--no-agent] [--yolo]
+  wtm open [branch-slug] [--agent <name>] [--no-agent] [--yolo]
   wtm rm [branch-slug] [--force]
   wtm clean [--force]
   wtm prune
-  wtm completion <worktrees|default-branch> [prefix]
+  wtm completion <worktrees|default-branch|agents> [prefix]
 `);
 }
 

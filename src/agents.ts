@@ -1,0 +1,157 @@
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
+export interface AgentDefinition {
+  name: string;
+  label: string;
+  command: string;
+  args: string[];
+  yoloArgs: string[];
+  source: "builtin" | "user";
+}
+
+export interface LoadAgentsOptions {
+  home?: string;
+  configPath?: string;
+}
+
+export interface LaunchOptions {
+  yolo?: boolean;
+}
+
+interface AgentConfig {
+  agents?: unknown;
+}
+
+const AGENT_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
+
+export const BUILTIN_AGENTS: AgentDefinition[] = [
+  {
+    name: "codex",
+    label: "Codex",
+    command: "codex",
+    args: [],
+    yoloArgs: ["--full-auto"],
+    source: "builtin",
+  },
+  {
+    name: "claude",
+    label: "Claude Code",
+    command: "claude",
+    args: [],
+    yoloArgs: ["--dangerously-skip-permissions"],
+    source: "builtin",
+  },
+];
+
+function getDefaultConfigPath(home: string): string {
+  return join(home, ".config", "wtm", "config.json");
+}
+
+function requireString(value: unknown, field: string, agentName?: string): string {
+  if (typeof value === "string" && value.trim().length > 0) {
+    return value;
+  }
+
+  const prefix = agentName ? `Agent '${agentName}'` : "Agent";
+  throw new Error(`${prefix} requires a non-empty '${field}'.`);
+}
+
+function optionalStringArray(value: unknown, field: string, agentName: string): string[] {
+  if (value === undefined) {
+    return [];
+  }
+
+  if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
+    throw new Error(`Agent '${agentName}' field '${field}' must be an array of strings.`);
+  }
+
+  return [...value];
+}
+
+function normalizeCustomAgent(value: unknown): AgentDefinition {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Each custom agent must be an object.");
+  }
+
+  const raw = value as Record<string, unknown>;
+  const name = requireString(raw.name, "name");
+  if (!AGENT_NAME_PATTERN.test(name)) {
+    throw new Error(`Invalid agent name '${name}'. Use letters, numbers, dots, dashes, or underscores.`);
+  }
+
+  const command = requireString(raw.command, "command", name);
+  const label = typeof raw.label === "string" && raw.label.trim().length > 0 ? raw.label : name;
+
+  return {
+    name,
+    label,
+    command,
+    args: optionalStringArray(raw.args, "args", name),
+    yoloArgs: optionalStringArray(raw.yoloArgs, "yoloArgs", name),
+    source: "user",
+  };
+}
+
+function readConfig(path: string): AgentConfig | undefined {
+  if (!existsSync(path)) {
+    return undefined;
+  }
+
+  try {
+    return JSON.parse(readFileSync(path, "utf8")) as AgentConfig;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to read agent config '${path}': ${message}`);
+  }
+}
+
+export function loadAgents(options: LoadAgentsOptions = {}): AgentDefinition[] {
+  const home = options.home ?? process.env.HOME ?? "";
+  const configPath = options.configPath ?? process.env.WTM_CONFIG ?? getDefaultConfigPath(home);
+  const config = readConfig(configPath);
+  const customAgents = config?.agents;
+
+  if (customAgents === undefined) {
+    return [...BUILTIN_AGENTS];
+  }
+
+  if (!Array.isArray(customAgents)) {
+    throw new Error("Agent config field 'agents' must be an array.");
+  }
+
+  const agents = [...BUILTIN_AGENTS];
+  for (const customAgent of customAgents) {
+    const normalized = normalizeCustomAgent(customAgent);
+    const existingIndex = agents.findIndex((agent) => agent.name === normalized.name);
+    if (existingIndex === -1) {
+      agents.push(normalized);
+    } else {
+      agents[existingIndex] = normalized;
+    }
+  }
+
+  return agents;
+}
+
+export function getAgentNames(agents: AgentDefinition[]): string[] {
+  return agents.map((agent) => agent.name);
+}
+
+export function getAgentByName(
+  agents: AgentDefinition[],
+  name: string,
+): AgentDefinition | undefined {
+  return agents.find((agent) => agent.name === name);
+}
+
+export function getAgentLaunchArgs(
+  agent: AgentDefinition,
+  options: LaunchOptions = {},
+): string[] {
+  if (!options.yolo) {
+    return [...agent.args];
+  }
+
+  return [...agent.args, ...agent.yoloArgs];
+}
