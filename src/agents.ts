@@ -1,5 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { loadWtmConfig, type WtmConfigLoadOptions } from "./wtm-config";
 
 export interface AgentDefinition {
   name: string;
@@ -10,17 +9,11 @@ export interface AgentDefinition {
   source: "builtin" | "user";
 }
 
-export interface LoadAgentsOptions {
-  home?: string;
-  configPath?: string;
-}
+/** Options for selecting the configuration file when loading agents. */
+export type LoadAgentsOptions = WtmConfigLoadOptions;
 
 export interface LaunchOptions {
   yolo?: boolean;
-}
-
-interface AgentConfig {
-  agents?: unknown;
 }
 
 const AGENT_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
@@ -43,10 +36,6 @@ export const BUILTIN_AGENTS: AgentDefinition[] = [
     source: "builtin",
   },
 ];
-
-function getDefaultConfigPath(home: string): string {
-  return join(home, ".config", "wtm", "config.json");
-}
 
 function requireString(value: unknown, field: string, agentName?: string): string {
   if (typeof value === "string" && value.trim().length > 0) {
@@ -93,23 +82,8 @@ function normalizeCustomAgent(value: unknown): AgentDefinition {
   };
 }
 
-function readConfig(path: string): AgentConfig | undefined {
-  if (!existsSync(path)) {
-    return undefined;
-  }
-
-  try {
-    return JSON.parse(readFileSync(path, "utf8")) as AgentConfig;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to read agent config '${path}': ${message}`);
-  }
-}
-
 export function loadAgents(options: LoadAgentsOptions = {}): AgentDefinition[] {
-  const home = options.home ?? process.env.HOME ?? "";
-  const configPath = options.configPath ?? process.env.WTM_CONFIG ?? getDefaultConfigPath(home);
-  const config = readConfig(configPath);
+  const config = loadWtmConfig(options);
   const customAgents = config?.agents;
 
   if (customAgents === undefined) {

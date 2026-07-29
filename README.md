@@ -4,7 +4,7 @@
 
 It is intentionally dependency-free at runtime. The CLI uses Bun plus Node built-ins only.
 
-It detects the current Git root automatically, creates worktrees in `.claude/worktrees`, and provides a small command set for the common lifecycle:
+It detects the current Git root automatically, creates worktrees in `.claude/worktrees` by default, and provides a small command set for the common lifecycle:
 - create a worktree from the repo default branch
 - create a worktree from a Linear issue with an auto-generated branch name
 - list worktrees in readable columns
@@ -64,6 +64,30 @@ Reload your shell:
 source ~/.zshrc
 ```
 
+## Configuration
+
+The optional user configuration file is `~/.config/wtm/config.json`. A relative
+`worktreeRoot` is resolved from each repository's Git root; an absolute path is used
+as-is. If `worktreeRoot` is omitted, worktrees continue to use `.claude/worktrees`.
+
+```json
+{
+  "worktreeRoot": ".wtm/worktrees",
+  "agents": [
+    {
+      "name": "pi",
+      "label": "Pi",
+      "command": "pi",
+      "args": [],
+      "yoloArgs": []
+    }
+  ]
+}
+```
+
+The `agents` array is optional. Set `WTM_CONFIG` to use a different configuration
+file.
+
 ## Usage
 
 Run `wtm` from anywhere inside a Git repo.
@@ -78,7 +102,7 @@ This will:
 - detect the repo root
 - detect the repo default branch
 - create a new branch from that default branch
-- create a worktree at `.claude/worktrees/feature--my-branch`
+- create a worktree under the configured root, `.claude/worktrees/feature--my-branch` by default
 - offer to launch `codex`, `claude`, or `pi`
 
 ### Create a worktree from a Linear issue
@@ -163,6 +187,6 @@ Pass `--yolo` to `new` or `open` to launch Codex with `--full-auto` or Claude wi
 
 ## Notes
 
-- Worktrees are repo-local and live under `.claude/worktrees`
+- Worktrees are repo-local and live under `.claude/worktrees` by default; use `worktreeRoot` to change the location
 - Branch slugs with `/` are mapped to directory names using `--`
 - `Esc` cancels the interactive launcher picker without launching anything

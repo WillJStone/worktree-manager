@@ -104,6 +104,44 @@ describe("git helpers", () => {
     expect(entries.some((entry) => entry.branch === "feature/test")).toBe(true);
   });
 
+  test("uses a configured relative worktree root", () => {
+    const repoDir = createRepo("main");
+    const configPath = join(repoDir, "wtm-config.json");
+    writeFileSync(configPath, JSON.stringify({ worktreeRoot: ".wtm/worktrees" }));
+
+    const context = resolveRepoContext(repoDir, { configPath });
+
+    expect(context.worktreeRoot).toBe(join(repoDir, ".wtm", "worktrees"));
+    expect(createWorktree(context, "feature/configured")).toBe(
+      join(repoDir, ".wtm", "worktrees", "feature--configured"),
+    );
+  });
+
+  test("uses a configured absolute worktree root", () => {
+    const repoDir = createRepo("main");
+    const configuredRoot = mkdtempSync(join(tmpdir(), "wtm-configured-root-"));
+    tempDirs.push(configuredRoot);
+    const configPath = join(repoDir, "wtm-config.json");
+    writeFileSync(configPath, JSON.stringify({ worktreeRoot: configuredRoot }));
+
+    const context = resolveRepoContext(repoDir, { configPath });
+
+    expect(context.worktreeRoot).toBe(configuredRoot);
+    expect(createWorktree(context, "feature/absolute")).toBe(
+      join(configuredRoot, "feature--absolute"),
+    );
+  });
+
+  test("rejects an invalid configured worktree root", () => {
+    const repoDir = createRepo("main");
+    const configPath = join(repoDir, "wtm-config.json");
+    writeFileSync(configPath, JSON.stringify({ worktreeRoot: 42 }));
+
+    expect(() => resolveRepoContext(repoDir, { configPath })).toThrow(
+      "WTM config field 'worktreeRoot' must be a non-empty string.",
+    );
+  });
+
   test("detects a master default branch without origin", () => {
     const repoDir = createRepo("master");
     const context = resolveRepoContext(repoDir);

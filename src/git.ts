@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync } from "node:fs";
 import { basename, join, relative, resolve } from "node:path";
+import { loadWtmConfig, type WtmConfigLoadOptions } from "./wtm-config";
 import type { CleanupCandidate, RepoContext, WorktreeEntry } from "./types";
 
 interface CommandResult {
@@ -32,7 +33,25 @@ function mustRunGit(args: string[], cwd: string, errorMessage: string): string {
   return result.stdout;
 }
 
-export function resolveRepoContext(cwd: string): RepoContext {
+function resolveConfiguredWorktreeRoot(
+  gitRoot: string,
+  configuredRoot: unknown,
+): string {
+  if (configuredRoot === undefined) {
+    return join(gitRoot, ".claude", "worktrees");
+  }
+
+  if (typeof configuredRoot !== "string" || configuredRoot.trim().length === 0) {
+    throw new Error("WTM config field 'worktreeRoot' must be a non-empty string.");
+  }
+
+  return resolve(gitRoot, configuredRoot.trim());
+}
+
+export function resolveRepoContext(
+  cwd: string,
+  options: WtmConfigLoadOptions = {},
+): RepoContext {
   const gitRoot = mustRunGit(
     ["rev-parse", "--show-toplevel"],
     cwd,
@@ -40,7 +59,8 @@ export function resolveRepoContext(cwd: string): RepoContext {
   );
 
   const defaultBranch = detectDefaultBranch(gitRoot);
-  const worktreeRoot = join(gitRoot, ".claude", "worktrees");
+  const config = loadWtmConfig(options);
+  const worktreeRoot = resolveConfiguredWorktreeRoot(gitRoot, config?.worktreeRoot);
 
   return {
     gitRoot,
